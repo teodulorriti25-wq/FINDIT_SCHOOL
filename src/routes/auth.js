@@ -34,7 +34,7 @@ router.post('/recuperar', h(async (req, res) => {
     await db.run('UPDATE recuperaciones SET usado=TRUE WHERE id_usuario=? AND usado=FALSE', [u.id_usuario]);
     await db.run("INSERT INTO recuperaciones (id_usuario, token_hash, expira) VALUES (?,?,NOW() + INTERVAL '1 hour')",
       [u.id_usuario, sha(token)]); // en la base solo se guarda el hash del token
-    const enlace = `${process.env.APP_URL || 'http://localhost:3000'}/#/restablecer/${token}`;
+    const enlace = `${process.env.APP_URL || 'https://findit-school.onrender.com'}/#/restablecer/${token}`;
     try {
       await enviarCorreo({
         para: correo, nombre: u.nombre, asunto: 'Restablece tu contraseña de FindIt School',
