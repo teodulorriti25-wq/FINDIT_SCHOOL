@@ -7,7 +7,10 @@ export function guardar(token, user) {
 }
 export function salir() {
   sesion.token = ''; sesion.user = null;
+  const sonido = localStorage.sonido; // el ajuste de sonido sobrevive al cierre de sesión
   localStorage.clear();
+  if (sonido) localStorage.sonido = sonido;
+  window.dispatchEvent(new Event('sesion-cerrada')); // socket.js cierra la conexión en vivo
   location.hash = '#/login';
 }
 export async function api(url, o = {}) {

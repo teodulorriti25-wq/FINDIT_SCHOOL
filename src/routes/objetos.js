@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const db = require('../db'), { guardarFoto } = require('../almacen');
+const db = require('../db'), { guardarFoto } = require('../almacen'), { emitir } = require('../realtime');
 const { h, auth, upload, idNumerico } = require('../middleware');
 router.param('id', idNumerico);
 
@@ -35,12 +35,15 @@ router.post('/objetos', auth, upload.single('foto'), h(async (req, res) => {
     'INSERT INTO objetos (id_usuario,id_categoria,nombre_objeto,descripcion,tipo,ubicacion,fecha_suceso) VALUES (?,?,?,?,?,?,?) RETURNING id_objeto',
     [req.user.id, id_categoria, nombre_objeto, descripcion, tipo, ubicacion, fecha_suceso]);
   if (req.file) await db.run('INSERT INTO fotografias (id_objeto, ruta_imagen) VALUES (?,?)', [r.id_objeto, await guardarFoto(req.file)]);
+  emitir('general', 'objeto:nuevo', { id_objeto: r.id_objeto, id_usuario: req.user.id, tipo, nombre_objeto });
   res.json({ id: r.id_objeto });
 }));
 router.patch('/objetos/:id/estado', auth, h(async (req, res) => {
   if (!['Abierto', 'Recuperado'].includes(req.body.estado)) return res.status(400).json({ error: 'Estado no válido' });
   const n = await db.run('UPDATE objetos SET estado=? WHERE id_objeto=? AND id_usuario=?', [req.body.estado, req.params.id, req.user.id]);
-  n ? res.json({ ok: 1 }) : res.status(403).json({ error: 'Solo quien publicó puede cambiarlo' });
+  if (!n) return res.status(403).json({ error: 'Solo quien publicó puede cambiarlo' });
+  emitir('general', 'objeto:cambio', { id_objeto: +req.params.id, id_usuario: req.user.id });
+  res.json({ ok: 1 });
 }));
 router.SEL = SEL;
 module.exports = router;

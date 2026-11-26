@@ -1,8 +1,13 @@
 import { api, sesion } from '../api.js';
 import { $, app, esc, fecha } from '../utils.js';
+import { enVivo } from '../socket.js';
 
 export async function detalle(id) {
   const o = await api('/objetos/' + id), mio = o.id_usuario === sesion.user.id, esAdmin = sesion.user.rol === 'admin';
+  if (location.hash !== '#/objeto/' + id) return; // la persona ya cambió de pantalla
+  // En vivo: si el objeto cambia se vuelve a pintar (salvo que esté escribiendo la verificación); si lo eliminan, se sale
+  enVivo('objeto:cambio', d => { if (String(d.id_objeto) === String(id) && !$('#dlg')?.open) detalle(id); });
+  enVivo('objeto:eliminado', d => { if (String(d.id_objeto) === String(id) && location.hash === '#/objeto/' + id) location.hash = '#/explorar'; });
   app.innerHTML = `<h1 style="font-size:1.4rem">Detalle del objeto</h1>
   <div class="detalle"><div class="imagen">${o.foto ? `<img src="${esc(o.foto)}" alt="${esc(o.nombre_objeto)}">` : '<div class="ph">Sin foto</div>'}</div>
   <div class="datos"><span class="pill pub">${o.tipo === 'Perdido' ? 'Objeto perdido' : 'Objeto encontrado'}</span>

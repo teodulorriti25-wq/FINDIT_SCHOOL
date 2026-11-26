@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const db = require('../db'), SEL = require('./objetos').SEL;
+const db = require('../db'), SEL = require('./objetos').SEL, { emitir } = require('../realtime');
 const { h, auth, soloAdmin, idNumerico } = require('../middleware');
 router.param('id', idNumerico);
 
@@ -13,6 +13,8 @@ router.get('/admin/resumen', auth, soloAdmin, h(async (req, res) => {
   res.json({ resumen, objetos, usuarios });
 }));
 router.delete('/admin/objetos/:id', auth, soloAdmin, h(async (req, res) => {
-  await db.run('DELETE FROM objetos WHERE id_objeto=?', [req.params.id]); res.json({ ok: 1 });
+  await db.run('DELETE FROM objetos WHERE id_objeto=?', [req.params.id]);
+  emitir('general', 'objeto:eliminado', { id_objeto: +req.params.id });
+  res.json({ ok: 1 });
 }));
 module.exports = router;

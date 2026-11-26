@@ -1,8 +1,12 @@
 import { api, sesion } from '../api.js';
 import { app, esc, fila } from '../utils.js';
+import { enVivo } from '../socket.js';
 
 export async function perfil() {
+  // En vivo: se repinta cuando cambia algo de mis publicaciones (alguien pidió contacto, se confirmó una entrega...)
+  ['objeto:cambio', 'objeto:eliminado', 'reconectado'].forEach(ev => enVivo(ev, d => { if (d?.id_usuario === undefined || d.id_usuario === sesion.user.id) perfil(); }));
   const o = await api('/mis-objetos'), u = sesion.user, rec = o.filter(x => x.estado === 'Recuperado').length;
+  if (!location.hash.startsWith('#/perfil')) return; // la persona ya cambió de pantalla
   const iniciales = u.nombre.split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
   app.innerHTML = `<h1>Perfil</h1><p class="sub">Administra tus publicaciones y solicitudes.</p>
   <div class="perfil-cab"><div class="avatar" aria-hidden="true">${esc(iniciales)}</div><div><h2>${esc(u.nombre)}</h2><p>${esc(u.correo || '')}</p><p>${u.rol === 'admin' ? 'Administrador' : 'Estudiante'}</p></div></div>

@@ -1,0 +1,15 @@
+/* Avisos en vivo: notificaciones emergentes, contador de pendientes y botón de sonido */
+#toasts{position:fixed;right:1rem;bottom:1rem;display:flex;flex-direction:column;gap:.6rem;z-index:50;max-width:min(360px,calc(100vw - 2rem))}
+.toast{display:flex;flex-direction:column;gap:.15rem;background:var(--blanco);color:var(--texto);border:1px solid var(--borde);border-left:5px solid var(--primario);border-radius:12px;padding:.8rem 1rem;box-shadow:0 10px 30px rgba(14,27,61,.2);text-decoration:none}
+.toast b{font:600 .98rem var(--f-titulo)}
+.toast span{color:var(--sec);font-size:.92rem;overflow-wrap:anywhere}
+.toast:focus-visible{outline:3px solid var(--primario);outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){
+  .toast{animation:entra .25s ease-out}
+  @keyframes entra{from{opacity:0;transform:translateY(10px)}}
+}
+.badge{display:inline-block;min-width:1.4rem;padding:0 .4rem;margin-left:.5rem;border-radius:99px;background:var(--coral-t);color:#fff;font-size:.78rem;font-weight:600;text-align:center;line-height:1.4rem}
+.badge[hidden]{display:none}
+#side nav .sonido{display:block;width:100%;margin-top:auto;text-align:left;background:transparent;color:var(--lateral);font:500 1rem var(--f-texto);padding:.75rem 1rem;border-radius:10px}
+#side nav .sonido:hover{background:rgba(255,255,255,.07);color:#fff}
+#side nav a.salir{margin-top:.3rem}

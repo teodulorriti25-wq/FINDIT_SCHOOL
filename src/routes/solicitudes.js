@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const db = require('../db');
+const db = require('../db'), { emitir } = require('../realtime');
 const { h, auth, idNumerico } = require('../middleware');
 router.param('id', idNumerico);
 
@@ -16,7 +16,7 @@ const participante = async (req, res) => {
 
 router.post('/solicitudes', auth, h(async (req, res) => {
   const { id_objeto, mensaje_verificacion = '' } = req.body;
-  const o = /^\d+$/.test(String(id_objeto)) ? await db.one('SELECT id_usuario, estado FROM objetos WHERE id_objeto=?', [id_objeto]) : null;
+  const o = /^\d+$/.test(String(id_objeto)) ? await db.one('SELECT id_usuario, estado, nombre_objeto FROM objetos WHERE id_objeto=?', [id_objeto]) : null;
   if (!o) return res.status(404).json({ error: 'Objeto inexistente' });
   if (o.id_usuario === req.user.id) return res.status(400).json({ error: 'No puedes reclamar tu propia publicación' });
   if (o.estado === 'Recuperado') return res.status(400).json({ error: 'Este objeto ya fue recuperado' });
@@ -25,6 +25,9 @@ router.post('/solicitudes', auth, h(async (req, res) => {
   if (dup.length) return res.status(409).json({ error: 'Ya enviaste una solicitud por este objeto' });
   const r = await db.one('INSERT INTO solicitudes (id_objeto,id_usuario,mensaje_verificacion) VALUES (?,?,?) RETURNING id_solicitud', [id_objeto, req.user.id, mensaje_verificacion.trim()]);
   await db.run("UPDATE objetos SET estado='En revisión' WHERE id_objeto=? AND estado='Abierto'", [id_objeto]);
+  // Aviso a quien publicó el objeto, y actualización de listas para todos (el objeto pasó a "En revisión")
+  emitir(`usuario:${o.id_usuario}`, 'solicitud:nueva', { id_solicitud: r.id_solicitud, nombre_objeto: o.nombre_objeto, solicitante: req.user.nombre });
+  emitir('general', 'objeto:cambio', { id_objeto: +id_objeto, id_usuario: o.id_usuario });
   res.json({ id: r.id_solicitud });
 }));
 router.get('/solicitudes', auth, h(async (req, res) =>
@@ -38,7 +41,11 @@ router.get('/solicitudes/:id/mensajes', auth, h(async (req, res) => {
 router.post('/solicitudes/:id/mensajes', auth, h(async (req, res) => {
   const s = await participante(req, res); if (!s) return;
   if (!(req.body.contenido || '').trim()) return res.status(400).json({ error: 'Escribe un mensaje' });
-  await db.run('INSERT INTO mensajes (id_solicitud,id_remitente,contenido) VALUES (?,?,?)', [s.id_solicitud, req.user.id, req.body.contenido.trim()]);
+  const texto = req.body.contenido.trim();
+  await db.run('INSERT INTO mensajes (id_solicitud,id_remitente,contenido) VALUES (?,?,?)', [s.id_solicitud, req.user.id, texto]);
+  // El aviso va solo a la otra persona de la conversación
+  const otro = s.id_usuario === req.user.id ? s.id_dueno : s.id_usuario;
+  emitir(`usuario:${otro}`, 'mensaje:nuevo', { id_solicitud: s.id_solicitud, nombre_objeto: s.nombre_objeto, de: req.user.nombre, contenido: texto.slice(0, 90) });
   res.json({ ok: 1 });
 }));
 router.patch('/solicitudes/:id', auth, h(async (req, res) => {
@@ -46,7 +53,11 @@ router.patch('/solicitudes/:id', auth, h(async (req, res) => {
   if (s.id_dueno !== req.user.id) return res.status(403).json({ error: 'Solo quien publicó el objeto decide' });
   if (!['En revisión', 'Cerrada'].includes(req.body.estado)) return res.status(400).json({ error: 'Estado no válido' });
   await db.run('UPDATE solicitudes SET estado=? WHERE id_solicitud=?', [req.body.estado, s.id_solicitud]);
-  if (req.body.estado === 'Cerrada') await db.run("UPDATE objetos SET estado='Recuperado' WHERE id_objeto=?", [s.id_objeto]);
+  if (req.body.estado === 'Cerrada') {
+    await db.run("UPDATE objetos SET estado='Recuperado' WHERE id_objeto=?", [s.id_objeto]);
+    emitir('general', 'objeto:cambio', { id_objeto: s.id_objeto, id_usuario: s.id_dueno });
+  }
+  emitir(`usuario:${s.id_usuario}`, 'solicitud:estado', { id_solicitud: s.id_solicitud, estado: req.body.estado, nombre_objeto: s.nombre_objeto });
   res.json({ ok: 1 });
 }));
 module.exports = router;
